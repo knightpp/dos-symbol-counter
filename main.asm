@@ -1,9 +1,9 @@
 macro setCursor x*, y*{
-    pusha
+    push dx
     mov dh,y
     mov dl,x
     call set_cursor
-    popa
+    pop dx
 }
 
 macro write_char char*{
@@ -40,7 +40,9 @@ main:
     call_if bx,0,je, place_array_element
     call_if bx,0,jne,increment_array_element
 
+    setCursor 0,0
     call print_array
+    setCursor 0,23
     jmp main
 
     call wait_exit
@@ -58,7 +60,7 @@ array_end = $
 
 print_array:
     mov bx, array   
-    setCursor 0,0
+    
 @@:
     if byte[bx],0,je, @f
     if bx, array_end, je, @f
@@ -80,32 +82,36 @@ print_array:
     inc bx
     jmp @b
 @@:
-    setCursor 0,23
+    
     mov bx,0
 
     RET
 
-
+; Write char to stdout
 ; <- DL - char to print
 print_char:
     mov ah, 0x02
     int 0x21
     RET
 
-
+; Read char from stdin
 ; -> AL - char
 read_key:         
     mov ah,1
     int 0x21
     RET
 
-
+; Move cursor to position
 ; <- DH - row
 ; <- DL - column
-set_cursor:        
+set_cursor:
+    push ax         
+    push dx
     mov  ah, 2      ; set cursor pos
     mov  bh, 0      ; video page            
-    int  10h                    
+    int  10h                
+    pop dx
+    pop ax    
     RET
 
 ; <- AL  - char
@@ -156,47 +162,35 @@ wait_exit:
     int 0x21
     RET
 
-; max 99
-; <- AL - number to print
-;print_number:
-;    xor ah,ah
-;    aam          ; divide by 10: quotient in ah, remainder in al (opposite of DIV)
-;    add  ax, "00"
-;    xchg al, ah
-;    mov  dx, ax
-;    mov  ah, 02h
-;    int  21h
-;    mov  dl, dh
-;    int  21h
-;    RET
-
+; Print HEX number with leading zero's
+; <- AX - number to prin
 printw:
     push ax
     shr ax, 8
-    call printb
+    call .printb
     pop ax
     push ax
     and  ax, 0xff
-    call printb
+    call .printb
     pop ax
-ret
+    RET
 
-printb:
-    push ax
-    shr al, 4
-    call printasc
-    pop ax
-    and al, 0xf
-    call printasc
-ret
+    .printb:
+        push ax
+        shr al, 4
+        call .printasc
+        pop ax
+        and al, 0xf
+        call .printasc
+    ret
 
-printasc:
-    add al, 0x30
-    cmp al, 0x39
-    jle printasc_e
-    add al, 0x7
-    printasc_e:
-    mov dl, al
-    mov ah, 0x2
-    int 0x21
-ret
+    .printasc:
+        add al, 0x30
+        cmp al, 0x39
+        jle .printasc_e
+        add al, 0x7
+        .printasc_e:
+        mov dl, al
+        mov ah, 0x2
+        int 0x21
+    ret
